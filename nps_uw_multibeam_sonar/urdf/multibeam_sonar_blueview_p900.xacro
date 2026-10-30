@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" xmlns:gz="http://gazebosim.org/schema">
 
   <!-- Generates a link element with Blueview P900 physical & visual characteristics -->
   <xacro:macro name="multibeam_blueview_p900_link" params="name scale">
@@ -139,6 +139,69 @@
           </noise>
         </lidar>
 
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- DAVE multibeam sonar (dave_multibeam_sonar package): a custom
+       gz-sensors RenderingSensor that owns its GPU rays and runs the CUDA
+       acoustic model on each frame in-process. Needs the
+       multibeam_sonar_system world plugin, which start_EROAS_demo injects
+       for sonar_source:=dave. ROS topics are <topic>/sonar_image_raw and
+       <topic>/sonar_image; the point cloud is the gz topic
+       <topic>/point_cloud.
+       DAVE gives every acoustic beam an aperture equal to the whole
+       configured vertical span and casts rays over the union of the beam
+       footprints, so the rays cover twice the configured span: +/-5 deg
+       here yields the P900's 20 deg vertical beam. -->
+  <xacro:macro name="multibeam_blueview_p900_dave_sensor"
+               params="name sensor_link topic maxDistance raySkips sensorGain plotScaler
+               writeLog writeFrameInterval fidelity debug">
+    <gazebo reference="${sensor_link}">
+      <sensor name="${name}_sensor" type="custom" gz:type="multibeam_sonar">
+        <always_on>true</always_on>
+        <update_rate>8.0</update_rate>
+        <visualize>false</visualize>
+        <topic>${topic}</topic>
+        <gz:multibeam_sonar>
+          <ray degrees="false">
+            <scan>
+              <horizontal>
+                <beams>512</beams>
+                <min_angle>-0.78539816339</min_angle>
+                <max_angle>0.78539816339</max_angle>
+              </horizontal>
+              <vertical>
+                <rays>${fidelity}</rays>
+                <min_angle>-0.0872664626</min_angle>
+                <max_angle>0.0872664626</max_angle>
+              </vertical>
+            </scan>
+            <range>
+              <min>0.1</min>
+              <max>${maxDistance + 2}</max>
+            </range>
+          </ray>
+          <spec>
+            <verticalFOV>20</verticalFOV>
+            <sonarFreq>900e3</sonarFreq>
+            <bandwidth>29.9e3</bandwidth>
+            <soundSpeed>1500</soundSpeed>
+            <sourceLevel>220</sourceLevel>
+            <maxDistance>${maxDistance}</maxDistance>
+            <raySkips>${raySkips}</raySkips>
+            <sensorGain>${sensorGain}</sensorGain>
+            <plotScaler>${plotScaler}</plotScaler>
+            <blazingSonarImage>false</blazingSonarImage>
+            <writeLog>${writeLog}</writeLog>
+            <debugFlag>${debug}</debugFlag>
+            <writeFrameInterval>${writeFrameInterval}</writeFrameInterval>
+            <pointCloudTopicName>point_cloud</pointCloudTopicName>
+            <sonarImageRawTopicName>sonar_image_raw</sonarImageRawTopicName>
+            <sonarImageTopicName>sonar_image</sonarImageTopicName>
+            <frameName>${name}_link</frameName>
+          </spec>
+        </gz:multibeam_sonar>
       </sensor>
     </gazebo>
   </xacro:macro>
@@ -282,7 +345,7 @@
                sonar_image_raw_topic maxDistance raySkips plotScaler sensorGain writeLog
                writeFrameInterval gaussian_noise_mean gaussian_noise_stddev fidelity
                artificialVehicleVibration constantReflectivity reflectivityDatabaseFile
-               robot_link ray_visual *origin">
+               robot_link ray_visual *origin sonar_backend:=lidar">
     <xacro:multibeam_blueview_p900_link name="${name}" scale="${scale}"/>
     <joint name="multibeam_sonar_joint" type="fixed">
       <parent link="${robot_link}"/>
@@ -290,6 +353,15 @@
       <xacro:insert_block name="origin"/>
     </joint>
 
+    <xacro:if value="${sonar_backend == 'dave'}">
+      <xacro:multibeam_blueview_p900_dave_sensor name="${name}" sensor_link="${name}_link"
+                                topic="/${robot_name}/${name}"
+                                maxDistance="${maxDistance}" raySkips="${raySkips}"
+                                sensorGain="${sensorGain}" plotScaler="${plotScaler}"
+                                writeLog="${writeLog}" writeFrameInterval="${writeFrameInterval}"
+                                fidelity="${fidelity}" debug="${debug}"/>
+    </xacro:if>
+    <xacro:unless value="${sonar_backend == 'dave'}">
     <xacro:if value="${gpu_ray}">
       <xacro:multibeam_blueview_p900_ray_sensor name="${name}" sensor_link="${name}_link"
                                 sonar_image_topic="${sonar_image_topic}" debug="${debug}"
@@ -311,6 +383,7 @@
                                 artificialVehicleVibration="${artificialVehicleVibration}"
                                 constantReflectivity="${constantReflectivity}"
                                 reflectivityDatabaseFile="${reflectivityDatabaseFile}"/>
+    </xacro:unless>
     </xacro:unless>
 
 

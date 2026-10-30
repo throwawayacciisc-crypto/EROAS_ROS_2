@@ -36,6 +36,13 @@
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>500</real_time_update_rate>
     </physics>
+    <!-- Gazebo Harmonic port: bullet-featherstone ignores per-link
+         <gravity>false</gravity>, and VelocityControl only cancels the fall
+         after each step, so the vehicle sank at g*dt = 0.02 m/s with no depth
+         command (out of SPD2C's +/-5 m depth band within minutes). In the
+         original, buoyancy and the UUV PID held depth. Everything else in this
+         world is static, so zero gravity is the equivalent. -->
+    <gravity>0 0 0</gravity>
     <scene>
       <ambient>0.0 0.4 0.7 1.0</ambient>
       <sky>

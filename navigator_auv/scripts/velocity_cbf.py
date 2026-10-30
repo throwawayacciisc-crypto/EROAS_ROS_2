@@ -851,11 +851,15 @@ class ObstacleAvoidanceNode(Node):
         naturally covers both sides when both are present.
         """
         constraints = []
-        for start_angle, end_angle, nearest_range in self.local_scg_obstacle_boundaries:
+        for _, _, nearest_range, bearing in self.local_scg_obstacle_boundaries:
             if not np.isfinite(nearest_range) or nearest_range > self.radius:
                 continue
 
-            bearing = 0.5 * (start_angle + end_angle)
+            # Place the point where the nearest return actually is. Using the
+            # sector's mid-bearing put a phantom obstacle at the nearest range
+            # but rotated toward the middle of a wide sector, often across the
+            # planner's clear heading, so ST-CBF reversed motion along paths
+            # that had real clearance.
             local_x = nearest_range * math.cos(bearing)
             local_y = nearest_range * math.sin(bearing)
             global_dx, global_dy = self._tf_l2g_xy(local_x, local_y)
@@ -886,7 +890,7 @@ class ObstacleAvoidanceNode(Node):
             return 'none'
         parts = [
             f'({start:.2f},{end:.2f},{nearest:.2f}m)'
-            for start, end, nearest in boundaries[:limit]
+            for start, end, nearest, _ in boundaries[:limit]
         ]
         if len(boundaries) > limit:
             parts.append(f'+{len(boundaries) - limit}more')
@@ -1180,10 +1184,12 @@ class ObstacleAvoidanceNode(Node):
                 start = index
             elif not blocked and start is not None:
                 end = index - 1
+                nearest_beam = start + int(np.argmin(hit_ranges[start:end + 1]))
                 boundaries.append((
                     self._scg_beam_to_angle(start),
                     self._scg_beam_to_angle(end),
-                    float(np.min(hit_ranges[start:end + 1])),
+                    float(hit_ranges[nearest_beam]),
+                    self._scg_beam_to_angle(nearest_beam),
                 ))
                 start = None
         return boundaries

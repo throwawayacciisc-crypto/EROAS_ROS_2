@@ -17,6 +17,10 @@ install(PROGRAMS
   scripts/trail_marker.py
   scripts/velocity_cbf.py
   scripts/waypoint_hover.py
+  scripts/ros1_only_gap.py
+  scripts/ros1_velocity_cbf.py
+  scripts/ros1_sonar_reconstruction.py
+  scripts/ros1_sonar_common.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

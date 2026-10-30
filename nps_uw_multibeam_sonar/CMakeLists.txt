@@ -5,12 +5,22 @@ project(nps_uw_multibeam_sonar)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_CUDA_COMPILER "nvcc")
-enable_language(CUDA CXX)
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_60")
-set(CMAKE_CUDA_STANDARD 17)
-set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-set_property(GLOBAL PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+# CUDA is only needed for the NPS multibeam sonar plugins. The EROAS demo
+# uses the gpu_lidar point cloud instead, so build without them if nvcc is
+# missing (models, urdf and launch files are still installed).
+include(CheckLanguage)
+check_language(CUDA)
+if(CMAKE_CUDA_COMPILER)
+  set(NPS_BUILD_CUDA_PLUGINS ON)
+  enable_language(CUDA)
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=sm_60")
+  set(CMAKE_CUDA_STANDARD 17)
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+  set_property(GLOBAL PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+else()
+  set(NPS_BUILD_CUDA_PLUGINS OFF)
+  message(WARNING "nvcc not found: skipping NPS multibeam sonar CUDA plugins")
+endif()
 
 # ── GCC 13 ABI fix — MUST come before any find_package ───────────────────────
 # Ogre-Next 2.3 on Ubuntu Noble was compiled with _GLIBCXX_USE_CXX11_ABI=1.
@@ -37,7 +47,7 @@ find_package(pcl_conversions REQUIRED)
 
 # ── Gazebo Harmonic (gz-sim 8) ────────────────────────────────────────────────
 find_package(gz-sim8 REQUIRED)
-find_package(gz-rendering8 REQUIRED COMPONENTS ogre2)
+find_package(gz-rendering8 REQUIRED)
 find_package(gz-sensors8 REQUIRED)
 find_package(gz-transport13 REQUIRED)
 find_package(gz-math7 REQUIRED)
@@ -47,17 +57,24 @@ find_package(gz-common5 REQUIRED)
 # ── Third-party ───────────────────────────────────────────────────────────────
 find_package(OpenCV REQUIRED)
 find_package(PCL REQUIRED)
-find_package(CUDAToolkit REQUIRED)
+if(NPS_BUILD_CUDA_PLUGINS)
+  find_package(CUDAToolkit REQUIRED)
+endif()
 
 # ── Ogre-Next 2.3 — use pkg-config with confirmed .pc name ───────────────────
 # .pc file confirmed: /usr/lib/x86_64-linux-gnu/pkgconfig/OGRE-2.3.pc
 # .so confirmed:      /usr/lib/x86_64-linux-gnu/OGRE-2.3/libOgreNextMain.so
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(OGRE_NEXT REQUIRED OGRE-2.3)
-# Also pull in gz-rendering8's ogre2 component flags — covers any
-# extra defines gz uses when wrapping Ogre-Next
-pkg_check_modules(GZ_OGRE2 REQUIRED gz-rendering8-ogre2)
+# Ogre-Next is only used by the CUDA sonar plugins.
+if(NPS_BUILD_CUDA_PLUGINS)
+  # System Ogre-Next names its .pc OGRE-2.3; the ROS Jazzy gz_ogre_next_vendor
+  # ships the same 2.3.x release as OGRE-Next.
+  pkg_search_module(OGRE_NEXT REQUIRED OGRE-2.3 OGRE-Next)
+  # Also pull in gz-rendering8's ogre2 component flags — covers any
+  # extra defines gz uses when wrapping Ogre-Next
+  pkg_check_modules(GZ_OGRE2 REQUIRED gz-rendering8-ogre2)
+endif()
 
 message(STATUS "OGRE-Next include dirs : ${OGRE_NEXT_INCLUDE_DIRS}")
 message(STATUS "OGRE-Next library dirs : ${OGRE_NEXT_LIBRARY_DIRS}")
@@ -134,6 +151,8 @@ set(SELECTION_BUFFER_SRCS
   src/SelectionRenderListener.cc
 )
 
+if(NPS_BUILD_CUDA_PLUGINS)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # TARGET 1 — raster-based (depth-camera) sonar plugin
 # ─────────────────────────────────────────────────────────────────────────────
@@ -161,8 +180,8 @@ ament_target_dependencies(nps_multibeam_sonar_ros_plugin
 
 target_link_libraries(nps_multibeam_sonar_ros_plugin
   ${GZ_LIBS}
-  ${OGRE_NEXT_LIBRARIES}         # OgreNextMain — from OGRE-2.3.pc
-  ${GZ_OGRE2_LIBRARIES}          # gz-rendering8 ogre2 wrapper
+  ${OGRE_NEXT_LINK_LIBRARIES}       # OgreNextMain — from OGRE-2.3.pc
+  ${GZ_OGRE2_LINK_LIBRARIES}        # gz-rendering8 ogre2 wrapper
   ${OpenCV_LIBS}
   ${PCL_LIBRARIES}
   CUDA::cudart
@@ -196,8 +215,8 @@ ament_target_dependencies(nps_multibeam_sonar_ray_ros_plugin
 
 target_link_libraries(nps_multibeam_sonar_ray_ros_plugin
   ${GZ_LIBS}
-  ${OGRE_NEXT_LIBRARIES}         # OgreNextMain — from OGRE-2.3.pc
-  ${GZ_OGRE2_LIBRARIES}          # gz-rendering8 ogre2 wrapper
+  ${OGRE_NEXT_LINK_LIBRARIES}       # OgreNextMain — from OGRE-2.3.pc
+  ${GZ_OGRE2_LINK_LIBRARIES}        # gz-rendering8 ogre2 wrapper
   ${OpenCV_LIBS}
   ${PCL_LIBRARIES}
   CUDA::cudart
@@ -212,6 +231,8 @@ install(TARGETS
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
+
+endif()
 
 install(DIRECTORY
   launch

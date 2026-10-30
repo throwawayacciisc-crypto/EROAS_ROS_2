@@ -1,15 +1,20 @@
 <?xml version='1.0' ?>
-<sdf version="1.6">
+<sdf version="1.11">
     <model name="CubeSoft">
         <static>true</static>
         <link name="link">
             <pose>0 0 0 1.57 3.14159 0</pose>
             <collision name="collision">
-                <pose>4.0 -4.875 7.944 0 0 0</pose>
+                <!-- Original EROAS mesh collision (the port had replaced it with the
+                     bounding box, which filled the non-convex notches with invisible
+                     solid volume the sonar cannot see). Convex decomposition lets
+                     bullet-featherstone collide with the true non-convex shape. -->
                 <geometry>
-                    <box>
-                        <size>8.0 15.506 6.004</size>
-                    </box>
+                    <mesh optimization="convex_decomposition">
+                        <convex_decomposition><max_convex_hulls>16</max_convex_hulls></convex_decomposition>
+                        <uri>meshes/6.stl</uri>
+                        <scale>0.001 0.001 0.001</scale>
+                    </mesh>
                 </geometry>
             </collision>
             <visual name="visual">

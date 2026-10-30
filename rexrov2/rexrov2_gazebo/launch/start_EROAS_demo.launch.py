@@ -1,4 +1,6 @@
 import os
+import re
+import tempfile
 
 from ament_index_python.packages import get_package_prefix, get_package_share_directory
 from launch import LaunchDescription
@@ -123,6 +125,9 @@ WORLD_A = {
     'paper_psi_max': 1.5707963267948966,
     'paper_vx_max': 1.0,
     'paper_max_yaw_rate': 0.26,
+    # safety_radius_xy (2.0) + 0.5 m, so gap_follow stops picking headings
+    # that ST-CBF has to reverse (see paper_gap_min_clearance in only_gap.py).
+    'paper_gap_min_clearance': 2.5,
     'min_forward_speed': 0.18,
     'max_vertical_speed': 0.5,
     'collision_distance': 2.2,
@@ -317,6 +322,14 @@ def _enabled_and_not_waypoint_hover(enabled_name):
     ])
 
 
+def _enabled_for_navigation(enabled_name, navigation):
+    """_enabled_and_not_waypoint_hover, and only for the given navigation stack."""
+    return PythonExpression([
+        _enabled_and_not_waypoint_hover(enabled_name),
+        " and '", LaunchConfiguration('navigation'), "'.lower() == '", navigation, "'",
+    ])
+
+
 def _camera_follow_actions():
     track_msg = (
         'track_mode: FOLLOW '
@@ -363,6 +376,40 @@ def _camera_follow_actions():
     ]
 
 
+# DAVE publishes FLOAT32 dB; the EROAS nodes map it to the UINT8
+# sensorGain*|P| scale their intensity thresholds (2 and 15) were tuned to.
+# 0.04 is the sensorGain the ROS 1 EROAS gave the NPS plugin
+# (start_EROAS_demo.launch), i.e. the same |P| -> UINT8 mapping. Measured
+# with the vehicle stationary at the World A spawn it gives echoes up to
+# ~212, 2.2% of pixels > 2 and 0.4% > 15.
+DAVE_SONAR_FLOAT_GAIN = 0.04
+
+DAVE_SONAR_SYSTEM_PLUGIN = (
+    '<plugin filename="multibeam_sonar_system" '
+    'name="custom::MultibeamSonarSystem"/>')
+
+
+def _world_with_dave_sonar_system(world_path):
+    """Return a copy of the world with DAVE's multibeam sonar system loaded.
+
+    The DAVE sensor is a custom gz sensor type, so it only exists if the
+    multibeam_sonar_system world plugin creates it. The shared world files
+    stay untouched; the copy goes to the temp dir (model:// URIs still
+    resolve through GZ_SIM_RESOURCE_PATH).
+    """
+    with open(world_path) as f:
+        sdf = f.read()
+    if 'multibeam_sonar_system' not in sdf:
+        sdf, count = re.subn(r'(<world\b[^>]*>)', r'\1\n    ' + DAVE_SONAR_SYSTEM_PLUGIN, sdf, count=1)
+        if count != 1:
+            raise RuntimeError(f'No <world> element found in {world_path}')
+    out_path = os.path.join(
+        tempfile.gettempdir(), 'eroas_dave_' + os.path.basename(world_path))
+    with open(out_path, 'w') as f:
+        f.write(sdf)
+    return out_path
+
+
 def _setup(context, *args, **kwargs):
     pkg_gazebo = get_package_share_directory('rexrov2_gazebo')
     pkg_worlds = get_package_share_directory('uuv_gazebo_worlds')
@@ -405,6 +452,16 @@ def _setup(context, *args, **kwargs):
     yaw = auto_value('yaw', spawn_yaw)
     green_wake = auto_value('green_wake', cfg.get('green_wake', 'false'))
     gui = LaunchConfiguration('gui').perform(context).lower() in ('1', 'true', 'yes', 'on')
+    # sonar_source:=dave (default) feeds SPD2C a real acoustic
+    # ProjectedSonarImage from the DAVE multibeam sonar (dave_multibeam_sonar;
+    # needs an NVIDIA GPU), as the original EROAS did with DAVE's NPS sonar.
+    # sonar_source:=lidar synthesizes it from a gz gpu_lidar point cloud.
+    sonar_source = LaunchConfiguration('sonar_source').perform(context).lower()
+    if sonar_source not in ('lidar', 'dave'):
+        raise RuntimeError(f"sonar_source must be 'lidar' or 'dave', got '{sonar_source}'")
+    use_dave_sonar = sonar_source == 'dave'
+    if use_dave_sonar:
+        world_path = _world_with_dave_sonar_system(world_path)
     start_pid_thrusters = (
         LaunchConfiguration('start_pid_thrusters').perform(context).lower()
         in ('1', 'true', 'yes', 'on')
@@ -414,7 +471,7 @@ def _setup(context, *args, **kwargs):
     # The classic UUV thruster plugins (libuuv_thruster_ros_plugin.so) do not
     # load in gz-sim, so the external ROS2 PID→thruster chain has no effect.
     use_velocity_control_plugin = 'true'
-    physics_args = '--physics-engine gz-physics-bullet-featherstone-plugin'
+    physics_args = '--physics-engine ' + LaunchConfiguration('physics_engine').perform(context)
     gz_args = f'{physics_args} -r {world_path}' if gui else f'-s {physics_args} -r {world_path}'
     # The <sensor> tag is authored on blueview_p900_link (a fixed child of
     # the pivoting rexrov2/sonar_link -- see multibeam_blueview_p900_macro in
@@ -430,6 +487,9 @@ def _setup(context, *args, **kwargs):
         f'/world/{gz_world_name}/model/rexrov2/link/rexrov2/sonar_link/'
         'sensor/blueview_p900_sensor/scan/points'
     )
+    if use_dave_sonar:
+        # DAVE publishes its point cloud on <sensor topic>/point_cloud.
+        sonar_points_gz_topic = '/rexrov2/blueview_p900/point_cloud'
 
     resource_paths = [
         pkg_gazebo,
@@ -450,6 +510,8 @@ def _setup(context, *args, **kwargs):
         os.path.join(get_package_prefix('uuv_gazebo_plugins'), 'lib'),
         os.path.join(get_package_prefix('uuv_world_ros_plugins'), 'lib'),
         os.path.join(get_package_prefix('nps_uw_multibeam_sonar'), 'lib'),
+        *([os.path.join(get_package_prefix('dave_multibeam_sonar'), 'lib')]
+          if use_dave_sonar else []),
         os.environ.get('GZ_SIM_SYSTEM_PLUGIN_PATH', ''),
     ]
 
@@ -488,6 +550,7 @@ def _setup(context, *args, **kwargs):
                         'yaw': yaw,
                         'sonar_name': 'blueview_p900',
                         'gpu_ray': 'true',
+                        'sonar_backend': 'dave' if use_dave_sonar else 'lidar',
                         'maxDistance': '15',
                         'fidelity': '500',
                         'raySkips': '10',
@@ -525,6 +588,8 @@ def _setup(context, *args, **kwargs):
                 # instead, pre-configured and already enabled (navigator_auv/rviz/
                 # sonar_rays.rviz), so no GUI interaction is required.
                 '/rexrov2/sonar_visual_rays@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
+                # Sonar pivot angle for sonar_reconstruction (navigation:=ros1).
+                '/rexrov2/joint_states@sensor_msgs/msg/JointState[gz.msgs.Model',
             ],
             remappings=[
                 (f'/world/{gz_world_name}/clock', '/clock'),
@@ -547,12 +612,12 @@ def _setup(context, *args, **kwargs):
             condition=IfCondition(LaunchConfiguration('start_pid_controller')),
         ),
 
-        Node(
+        *([] if use_dave_sonar else [Node(
             package='navigator_auv',
             executable='sonar_frame_converter.py',
             name='sonar_frame_converter',
             output='screen',
-        ),
+        )]),
 
         Node(
             package='navigator_auv',
@@ -617,9 +682,14 @@ def _setup(context, *args, **kwargs):
                 'paper_vx_max': cfg.get('paper_vx_max', 1.0),
                 'paper_max_yaw_rate': cfg.get('paper_max_yaw_rate', 0.26),
                 'paper_convexity_threshold': cfg.get('paper_convexity_threshold', 0.02),
+                'paper_gap_min_clearance': cfg.get('paper_gap_min_clearance', 0.0),
+                # DAVE stamps sonar frames with sim time; this node runs on
+                # wall time, so judge freshness by arrival instead.
+                'sonar_check_stamp': not use_dave_sonar,
+                'sonar_float_gain': DAVE_SONAR_FLOAT_GAIN,
             }],
             output='screen',
-            condition=IfCondition(_enabled_and_not_waypoint_hover('start_navigator')),
+            condition=IfCondition(_enabled_for_navigation('start_navigator', 'port')),
         ),
 
         # Hover hold owns /rexrov2/cmd_vel directly, so it must be mutually
@@ -722,7 +792,7 @@ def _setup(context, *args, **kwargs):
                 'hover_lock_min_yaw_cmd': 0.08,
             }],
             output='screen',
-            condition=IfCondition(_enabled_and_not_waypoint_hover('start_cbf')),
+            condition=IfCondition(_enabled_for_navigation('start_cbf', 'port')),
         ),
 
         Node(
@@ -750,7 +820,42 @@ def _setup(context, *args, **kwargs):
             name='sonar_reconstruction',
             parameters=[{'use_sim_time': False}],
             output='screen',
-            condition=IfCondition(LaunchConfiguration('start_sonar_reconstruction')),
+            condition=IfCondition(PythonExpression([
+                "'", LaunchConfiguration('start_sonar_reconstruction'), "'.lower() in ",
+                TRUTHY_LAUNCH_VALUES, " and '", LaunchConfiguration('navigation'),
+                "'.lower() != 'ros1'"])),
+        ),
+
+        # navigation:=ros1 -- direct ports of the AIRLabIISc/EROAS ROS 1 nodes,
+        # wired as in its start_EROAS_demo.launch: only_gap -> cmd_vel_1 ->
+        # velocity_cbf -> cmd_vel, with the CBF's obstacles reconstructed from
+        # the sonar image by sonar_reconstruction (/rexrov2/point_cloud).
+        Node(
+            package='navigator_auv',
+            executable='ros1_only_gap.py',
+            name='sonar_heading_node',
+            parameters=[{'use_sim_time': False, 'sonar_float_gain': DAVE_SONAR_FLOAT_GAIN}],
+            additional_env={'PYTHONUNBUFFERED': '1'},
+            output='screen',
+            condition=IfCondition(_enabled_for_navigation('start_navigator', 'ros1')),
+        ),
+        Node(
+            package='navigator_auv',
+            executable='ros1_velocity_cbf.py',
+            name='obstacle_avoidance_node',
+            parameters=[{'use_sim_time': False}],
+            additional_env={'PYTHONUNBUFFERED': '1'},
+            output='screen',
+            condition=IfCondition(_enabled_for_navigation('start_cbf', 'ros1')),
+        ),
+        Node(
+            package='navigator_auv',
+            executable='ros1_sonar_reconstruction.py',
+            name='sonar_reconstruction',
+            parameters=[{'use_sim_time': False, 'sonar_float_gain': DAVE_SONAR_FLOAT_GAIN}],
+            additional_env={'PYTHONUNBUFFERED': '1'},
+            output='screen',
+            condition=IfCondition(_enabled_for_navigation('start_cbf', 'ros1')),
         ),
 
         *([
@@ -836,6 +941,15 @@ def generate_launch_description():
         # Pass auto_follow:=true when a chase camera is desired.
         DeclareLaunchArgument('auto_follow', default_value='false'),
         DeclareLaunchArgument('show_sonar_probe', default_value='false'),
+        DeclareLaunchArgument('physics_engine', default_value='gz-physics-bullet-featherstone-plugin',
+                              description='gz-physics engine plugin passed to gz sim --physics-engine'),
+        DeclareLaunchArgument('navigation', default_value='ros1',
+                              description="Navigation nodes: 'port' (this repo's reworked only_gap/"
+                                          "velocity_cbf) or 'ros1' (direct ports of the original "
+                                          "AIRLabIISc/EROAS only_gap, velocity_cbf and sonar_reconstruction)"),
+        DeclareLaunchArgument('sonar_source', default_value='dave',
+                              description="Sonar image for navigation: 'lidar' (synthetic from the "
+                                          "point cloud) or 'dave' (DAVE multibeam sonar; needs an NVIDIA GPU)"),
         DeclareLaunchArgument('start_waypoint_hover', default_value='false',
                               description='Launch waypoint_hover standalone controller (disables navigator and CBF)'),
         OpaqueFunction(function=_setup),

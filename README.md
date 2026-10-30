@@ -1,5 +1,77 @@
 # EROAS Underwater Vehicle Simulation
 
+## Quick start (ROS 2 Jazzy / Gazebo Harmonic, original EROAS logic)
+
+By default the demo now runs the **original AIRLabIISc/EROAS algorithm** on the
+**DAVE multibeam sonar**, wired as in the ROS 1 `start_EROAS_demo.launch`:
+
+```
+DAVE sonar image ──► ros1_only_gap.py (SPD2C) ──► /rexrov2/cmd_vel_1 ──► ros1_velocity_cbf.py (ST-CBF) ──► /rexrov2/cmd_vel
+        └────────► ros1_sonar_reconstruction.py (SCG) ──► /rexrov2/point_cloud ──┘
+```
+
+The `ros1_*` scripts in `navigator_auv/scripts/` are line-for-line ROS 2 ports of
+the original `only_gap.py`, `velocity_cbf.py` and `sonar_reconstruction.py`;
+every deviation is marked `ADAPTED` in the code. Needs an NVIDIA GPU and the
+CUDA toolkit (for `dave_multibeam_sonar`, see its README).
+
+```bash
+source /opt/ros/jazzy/setup.bash
+cd ~/eroas_ws && colcon build --cmake-args -DCMAKE_CUDA_HOST_COMPILER=g++-12
+source install/local_setup.bash
+ros2 launch rexrov2_gazebo start_EROAS_demo.launch.py world_name:=world_a
+# sonar fan image:
+ros2 run rqt_image_view rqt_image_view /rexrov2/blueview_p900/sonar_image
+```
+
+Options:
+
+| Argument | Default | Other values |
+|---|---|---|
+| `navigation` | `ros1` (original EROAS nodes) | `port` (this repo's reworked `only_gap.py` / `velocity_cbf.py`) |
+| `sonar_source` | `dave` (DAVE acoustic sonar, GPU) | `lidar` (synthetic sonar image from a gz GPU lidar; no CUDA) |
+| `physics_engine` | `gz-physics-bullet-featherstone-plugin` | `gz-physics-dartsim-plugin` (fails with LCP NaN errors in World A) |
+
+### Watching it run (Gazebo window + RViz)
+
+Start the server with `gui:=false`, wait for `Entity creation successful`
+(RexROV2 spawned), then open the GUI and RViz. A GUI started before the spawn
+never shows the vehicle.
+
+```bash
+ros2 launch rexrov2_gazebo start_EROAS_demo.launch.py gui:=false world_name:=world_a
+gz sim -g --force-version 8          # after the vehicle has spawned
+rviz2 -d tools/sonar.rviz            # sonar fan image, Reliable QoS
+python3 tools/teleop.py              # manual driving + sonar tilt (stop the EROAS nodes first)
+```
+
+`tools/teleop.py` keys: `w/s` surge, `a/d` yaw, `q/e` sway, `r/f` heave,
+`space` stop, `i/k` sonar tilt ±5°, `o` tilt 0°, `x` quit.
+
+### Harmonic port fixes (2026-10-30)
+
+With these fixes the original logic leaves the start area by searching for
+gaps, as it did in ROS 1, and reaches waypoint 1 in World A.
+
+- **Sonar beam order** (`navigator_auv/scripts/ros1_sonar_common.py`): DAVE's
+  beam 0 is the vehicle's left, but the EROAS code assumes beam 0 is the
+  right. FLOAT32 frames are now mirrored across the beams. Before this, SPD2C
+  turned toward obstacles and dithered at the spawn point.
+- **Zero world gravity** (`obstacle_avoidance.world`): bullet-featherstone
+  ignores per-link gravity off, so the vehicle sank about 0.02 m/s, left the
+  ±5 m depth band and pushed `only_gap` into its 3-D mode.
+- **Obstacle collisions** (`CubeSoft_{5,6,9,13}`): restores the original mesh
+  collision shapes (convex decomposition, 16 hulls) in place of the bounding
+  boxes, which left invisible walls inside the shapes' notches.
+- **DAVE fan image** (`dave_multibeam_sonar/src/MultibeamSonarSensor.cc`):
+  - The per-bin `cv::ellipse` drawing (~0.3 s a frame) is replaced with a
+    pixel → (beam, bin) lookup table built once. The rate with RViz open went
+    from 3.1 Hz to about 4.1 Hz.
+  - Frames with no returns, e.g. with the sonar tilted up into open water,
+    now draw black instead of a uniform bright fan.
+
+The rest of this README describes the earlier WSL setup and the `navigation:=port` stack.
+
 A step-by-step guide to building, launching, visualizing, and testing the EROAS underwater vehicle simulation using **ROS 2 Jazzy, Gazebo Harmonic, and Ubuntu 24.04 on WSL**.
 
 ## 1. Project Overview

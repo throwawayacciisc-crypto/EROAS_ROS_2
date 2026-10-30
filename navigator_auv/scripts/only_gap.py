@@ -66,6 +66,16 @@ class SonarHeadingNode(Node):
         self.declare_parameter('prefer_point_cloud_sonar', True)
         self.declare_parameter('waypoints', '29,97,-50;31,110,-55;30,90,-90;30,120,-40')
         self.declare_parameter('sonar_timeout', 1.0)
+        # The NPS plugin stamps sonar_image_raw with Gazebo sim time while this
+        # node runs on wall time, so a header-age check rejects every frame.
+        # False judges freshness by arrival time only (last_sonar_time).
+        self.declare_parameter('sonar_check_stamp', True)
+        # DAVE's multibeam sonar publishes FLOAT32 intensities in dB
+        # (20*log10|P|); the NPS plugin the reference EROAS used published
+        # UINT8 sensorGain*|P|, which every intensity threshold here is tuned
+        # to. FLOAT32 frames are mapped back to that scale with this gain
+        # (the NPS/EROAS sensorGain).
+        self.declare_parameter('sonar_float_gain', 0.04)
         self.declare_parameter('cruise_speed', 0.55)
         self.declare_parameter('fallback_speed', 0.35)
         self.declare_parameter('fallback_yaw_kp', 0.8)
@@ -218,6 +228,18 @@ class SonarHeadingNode(Node):
         # elevation, so the pivot search always came back empty even when a
         # real vertical opening existed.
         self.declare_parameter('paper_vertical_intensity_threshold', 15.0)
+        # gap_follow aims at the gap window closest to the goal, i.e. only
+        # half a window inside the gap's goal-side edge. Near an obstacle that
+        # puts the path well inside velocity_cbf's safety radius, so SPD2C
+        # keeps commanding headings ST-CBF must reverse and the vehicle
+        # oscillates against the edge. When > 0, a candidate heading is only
+        # accepted if every sonar hit ahead of the vehicle lies at least this
+        # far (m) from the straight path along it. 0 keeps the reference
+        # behaviour.
+        self.declare_parameter('paper_gap_min_clearance', 0.0)
+        # Only hits within this forward distance (m) count; matches
+        # velocity_cbf's default cbf_influence_distance.
+        self.declare_parameter('paper_gap_clearance_horizon', 8.0)
         # If no horizontal gap_follow beam has been found for this long,
         # escalate straight to the vertical pivot search regardless of the
         # convexity/boundedness classification. Observed in World A: right
@@ -316,6 +338,8 @@ class SonarHeadingNode(Node):
 
         self.sonar_timeout_ns = int(
             float(self.get_parameter('sonar_timeout').value) * 1e9)
+        self.sonar_check_stamp = bool(self.get_parameter('sonar_check_stamp').value)
+        self.sonar_float_gain = float(self.get_parameter('sonar_float_gain').value)
         self.cruise_speed = float(self.get_parameter('cruise_speed').value)
         self.fallback_speed = float(self.get_parameter('fallback_speed').value)
         self.fallback_yaw_kp = float(self.get_parameter('fallback_yaw_kp').value)
@@ -446,6 +470,10 @@ class SonarHeadingNode(Node):
             self.get_parameter('paper_intensity_threshold').value)
         self.paper_vertical_intensity_threshold = float(
             self.get_parameter('paper_vertical_intensity_threshold').value)
+        self.paper_gap_min_clearance = float(
+            self.get_parameter('paper_gap_min_clearance').value)
+        self.paper_gap_clearance_horizon = float(
+            self.get_parameter('paper_gap_clearance_horizon').value)
         self.paper_stuck_timeout = float(
             self.get_parameter('paper_stuck_timeout').value)
         self.paper_beam_stride = 5
@@ -555,13 +583,19 @@ class SonarHeadingNode(Node):
             self.update_goal()
 
     def sonar_image_raw_callback(self, data):
-        if not self._message_stamp_is_fresh(data):
+        if self.sonar_check_stamp and not self._message_stamp_is_fresh(data):
             return
         self.beam_directions = data.beam_directions
         self.ranges = data.ranges
         self.ping_info = data.ping_info
         if self.beam_directions and self.ranges and data.image.data and self.ping_info:
-            self.data_raw = np.frombuffer(data.image.data, dtype=np.uint8)
+            if data.image.dtype == data.image.DTYPE_FLOAT32:
+                power_db = np.frombuffer(bytes(data.image.data), dtype=np.float32)
+                amplitude = np.power(10.0, np.nan_to_num(power_db, nan=-np.inf) / 20.0)
+                self.data_raw = np.clip(
+                    self.sonar_float_gain * amplitude, 0, 255).astype(np.uint8)
+            else:
+                self.data_raw = np.frombuffer(data.image.data, dtype=np.uint8)
             self.data_available = True
             self.last_sonar_time = self.get_clock().now()
             self.fallback_announced = False
@@ -1324,6 +1358,29 @@ class SonarHeadingNode(Node):
                 mids.append(free_beams[i + span // 2])
         return mids
 
+    def _paper_hit_polar(self, data, ranges):
+        """First return per beam as (bearing rad, range m) arrays, using the
+        same range band and threshold as _paper_classify_beams."""
+        range_count, beam_count = data.shape
+        start_bin = min(10, max(0, range_count - 1))
+        end_bin = max(start_bin + 1, range_count - 40)
+        band = data[start_bin:end_bin, :] > self.paper_intensity_threshold
+        has_hit = band.any(axis=0)
+        first = start_bin + np.argmax(band, axis=0)
+        max_range = float(ranges[-1]) if len(ranges) else self.sonar_max_range
+        beams = np.nonzero(has_hit)[0]
+        bearings = np.array([self._beam_to_angle(b, beam_count) for b in beams])
+        return bearings, first[beams] * max_range / range_count
+
+    def _paper_heading_has_clearance(self, beam, beam_count, hit_bearings, hit_ranges):
+        if self.paper_gap_min_clearance <= 0.0 or hit_ranges.size == 0:
+            return True
+        rel = hit_bearings - self._beam_to_angle(beam, beam_count)
+        forward = hit_ranges * np.cos(rel)
+        ahead = (forward > 0.0) & (forward <= self.paper_gap_clearance_horizon)
+        lateral = np.abs(hit_ranges[ahead] * np.sin(rel[ahead]))
+        return lateral.size == 0 or float(lateral.min()) >= self.paper_gap_min_clearance
+
     def _paper_boundedness_turn(self, free_beams, beam_count, stride):
         """Mirrors the reference check_for_boundedness: if the obstacle
         field is open on exactly one FOV edge, aim toward that edge (BO ->
@@ -1913,6 +1970,14 @@ class SonarHeadingNode(Node):
                 b for b in mid_beams
                 if not self._is_known_bad_heading(
                     current_yaw + self._beam_to_angle(b, beam_count), current_xy)
+            ]
+
+        if mid_beams and self.paper_gap_min_clearance > 0.0:
+            hit_bearings, hit_ranges = self._paper_hit_polar(data, ranges)
+            mid_beams = [
+                b for b in mid_beams
+                if self._paper_heading_has_clearance(
+                    b, beam_count, hit_bearings, hit_ranges)
             ]
 
         bcl = None
