@@ -1,0 +1,249 @@
+from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+
+from launch_ros.actions import Node
+
+from ament_index_python.packages import get_package_share_directory
+
+import os
+
+
+def generate_launch_description():
+
+    # --------------------------------------------------------------------------
+    # Launch arguments
+    # --------------------------------------------------------------------------
+
+    set_timeout = LaunchConfiguration('set_timeout')
+    timeout = LaunchConfiguration('timeout')
+
+    starting_time = LaunchConfiguration('starting_time')
+    end_time = LaunchConfiguration('end_time')
+
+    current_vel = LaunchConfiguration('current_vel')
+    horizontal_angle = LaunchConfiguration('horizontal_angle')
+    vertical_angle = LaunchConfiguration('vertical_angle')
+
+    x = LaunchConfiguration('x')
+    y = LaunchConfiguration('y')
+    z = LaunchConfiguration('z')
+    yaw = LaunchConfiguration('yaw')
+
+    K = LaunchConfiguration('K')
+    Kd = LaunchConfiguration('Kd')
+    Ki = LaunchConfiguration('Ki')
+    slope = LaunchConfiguration('slope')
+
+    # --------------------------------------------------------------------------
+    # Package paths
+    # --------------------------------------------------------------------------
+
+    world_launch = os.path.join(
+        get_package_share_directory('uuv_gazebo_worlds'),
+        'launch',
+        'empty_underwater_world.launch.py'
+    )
+
+    rexrov_launch = os.path.join(
+        get_package_share_directory('uuv_descriptions'),
+        'launch',
+        'upload_rexrov.launch.py'
+    )
+
+    controller_launch = os.path.join(
+        get_package_share_directory('uuv_trajectory_control'),
+        'launch',
+        'rov_nmb_sm_controller.launch.py'
+    )
+
+    circular_traj_launch = os.path.join(
+        get_package_share_directory('uuv_control_utils'),
+        'launch',
+        'start_circular_trajectory.launch.py'
+    )
+
+    timed_current_launch = os.path.join(
+        get_package_share_directory('uuv_control_utils'),
+        'launch',
+        'set_timed_current_perturbation.launch.py'
+    )
+
+    rviz_config = os.path.join(
+        get_package_share_directory('uuv_gazebo'),
+        'rviz',
+        'controller_demo.rviz'
+    )
+
+    # --------------------------------------------------------------------------
+    # Launch description
+    # --------------------------------------------------------------------------
+
+    return LaunchDescription([
+
+        # ----------------------------------------------------------------------
+        # Arguments
+        # ----------------------------------------------------------------------
+
+        DeclareLaunchArgument(
+            'set_timeout',
+            default_value='false'
+        ),
+
+        DeclareLaunchArgument(
+            'timeout',
+            default_value='105'
+        ),
+
+        DeclareLaunchArgument(
+            'starting_time',
+            default_value='10'
+        ),
+
+        DeclareLaunchArgument(
+            'end_time',
+            default_value='40'
+        ),
+
+        DeclareLaunchArgument(
+            'current_vel',
+            default_value='0.7'
+        ),
+
+        DeclareLaunchArgument(
+            'horizontal_angle',
+            default_value='50'
+        ),
+
+        DeclareLaunchArgument(
+            'vertical_angle',
+            default_value='20'
+        ),
+
+        DeclareLaunchArgument(
+            'x',
+            default_value='0'
+        ),
+
+        DeclareLaunchArgument(
+            'y',
+            default_value='0'
+        ),
+
+        DeclareLaunchArgument(
+            'z',
+            default_value='-20'
+        ),
+
+        DeclareLaunchArgument(
+            'yaw',
+            default_value='0'
+        ),
+
+        DeclareLaunchArgument(
+            'K',
+            default_value='5,5,5,5,5,5'
+        ),
+
+        DeclareLaunchArgument(
+            'Kd',
+            default_value='4118.98,4118.98,4118.98,8000.0,8000.0,8000.0'
+        ),
+
+        DeclareLaunchArgument(
+            'Ki',
+            default_value='0.06144,0.06144,0.06144,0.078,0.078,0.078'
+        ),
+
+        DeclareLaunchArgument(
+            'slope',
+            default_value='0.182,0.182,0.182,3.348,3.348,3.348'
+        ),
+
+        # ----------------------------------------------------------------------
+        # Empty underwater world
+        # ----------------------------------------------------------------------
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(world_launch),
+            launch_arguments={
+                'set_timeout': 'true',
+                'timeout': timeout
+            }.items()
+        ),
+
+        # ----------------------------------------------------------------------
+        # Spawn RexROV
+        # ----------------------------------------------------------------------
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(rexrov_launch),
+            launch_arguments={
+                'x': x,
+                'y': y,
+                'z': z,
+                'yaw': yaw
+            }.items()
+        ),
+
+        # ----------------------------------------------------------------------
+        # Controller
+        # ----------------------------------------------------------------------
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(controller_launch),
+            launch_arguments={
+                'uuv_name': 'rexrov',
+                'model_name': 'rexrov',
+                'K': K,
+                'Kd': Kd,
+                'Ki': Ki,
+                'slope': slope
+            }.items()
+        ),
+
+        # ----------------------------------------------------------------------
+        # Circular trajectory
+        # ----------------------------------------------------------------------
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(circular_traj_launch),
+            launch_arguments={
+                'uuv_name': 'rexrov',
+                'radius': '5',
+                'center_z': '-25',
+                'max_forward_speed': '0.6'
+            }.items()
+        ),
+
+        # ----------------------------------------------------------------------
+        # Timed current perturbation
+        # ----------------------------------------------------------------------
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(timed_current_launch),
+            launch_arguments={
+                'starting_time': starting_time,
+                'end_time': end_time,
+                'current_vel': current_vel,
+                'horizontal_angle': horizontal_angle,
+                'vertical_angle': vertical_angle
+            }.items()
+        ),
+
+        # ----------------------------------------------------------------------
+        # RViz2
+        # ----------------------------------------------------------------------
+
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            output='screen',
+            arguments=[
+                '-d',
+                rviz_config
+            ]
+        )
+    ])

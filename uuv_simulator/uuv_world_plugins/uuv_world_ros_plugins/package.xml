@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<package format="3">
+
+  <name>uuv_world_ros_plugins</name>
+  <version>0.6.13</version>
+
+  <description>
+    ROS2 Gazebo Harmonic world plugins for UUV Simulator
+  </description>
+
+  <maintainer email="musa.marcusso@de.bosch.com">
+    Musa Morena Marcusso Manhaes
+  </maintainer>
+
+  <maintainer email="sebastian.scherer2@de.bosch.com">
+    Sebastian Scherer
+  </maintainer>
+
+  <maintainer email="luizricardo.douat@de.bosch.com">
+    Luiz Ricardo Douat
+  </maintainer>
+
+  <license>Apache-2.0</license>
+
+  <!-- Build tool -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- ROS2 -->
+  <depend>rclcpp</depend>
+  <depend>geometry_msgs</depend>
+
+  <!-- Gazebo Harmonic -->
+  <depend>gz-sim8</depend>
+  <depend>gz-plugin2</depend>
+  <depend>gz-math7</depend>
+
+  <!-- UUV -->
+  <depend>uuv_world_plugins</depend>
+  <depend>uuv_world_ros_plugins_msgs</depend>
+
+  <!-- Export -->
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+
+</package>

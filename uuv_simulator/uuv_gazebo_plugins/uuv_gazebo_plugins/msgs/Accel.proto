@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package uuv_gazebo_plugins_msgs.msgs;
+
+message Accel
+{
+  optional double linear_x = 1 [default = 0.0];
+  optional double linear_y = 2 [default = 0.0];
+  optional double linear_z = 3 [default = 0.0];
+  optional double angular_x = 4 [default = 0.0];
+  optional double angular_y = 5 [default = 0.0];
+  optional double angular_z = 6 [default = 0.0];
+}

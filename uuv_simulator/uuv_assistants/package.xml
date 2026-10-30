@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+
+<package format="3">
+
+  <name>uuv_assistants</name>
+
+  <version>0.6.13</version>
+
+  <description>
+    Tools and utilities for UUV ROS2 Jazzy
+  </description>
+
+  <maintainer email="musa.marcusso@de.bosch.com">
+    Musa Morena Marcusso
+  </maintainer>
+
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>
+    ament_cmake
+  </buildtool_depend>
+
+  <depend>rclcpp</depend>
+
+  <depend>nav_msgs</depend>
+
+  <depend>geometry_msgs</depend>
+
+  <depend>sensor_msgs</depend>
+
+  <depend>tf2_ros</depend>
+
+  <depend>visualization_msgs</depend>
+
+  <exec_depend>python3-numpy</exec_depend>
+
+  <exec_depend>tf_transformations</exec_depend>
+
+  <exec_depend>ros_gz_sim</exec_depend>
+
+  <exec_depend>ros_gz_bridge</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+
+</package>

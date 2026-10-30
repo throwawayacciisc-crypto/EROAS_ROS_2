@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<robot name="$ROBOT_NAME" xmlns:xacro="http://www.ros.org/wiki/xacro" >
+  <xacro:arg name="debug" default="0"/>
+  <xacro:arg name="namespace" default="$ROBOT_NAME"/>
+  <!-- Include the ROV macro file -->
+  <xacro:include filename="$(find $CATKIN_PACKAGE)/urdf/base.xacro"/>
+  <xacro:include filename="$(find $CATKIN_PACKAGE)/urdf/gazebo.xacro"/>
+
+  <!-- Create the $ROBOT_NAME -->
+  <xacro:$ROBOT_NAME_base namespace="$(arg namespace)">
+    <gazebo>
+      <plugin name="uuv_plugin" filename="libgz-sim-buoyancy-system.so">
+        <fluid_density>1028.0</fluid_density>
+        <debug>$(arg debug)</debug>
+      </plugin>
+    </gazebo>
+  </xacro:$ROBOT_NAME_base>
+
+  <!-- Joint state publisher plugin -->
+  <xacro:default_joint_state_publisher namespace="$(arg namespace)" update_rate="10"/>
+
+</robot>

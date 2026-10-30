@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<package format="3">
+
+  <name>uuv_teleop</name>
+  <version>1.0.0</version>
+
+  <description>
+    ROS 2 teleoperation nodes for UUVs using joystick and keyboard inputs.
+  </description>
+
+  <maintainer email="you@example.com">Your Name</maintainer>
+
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclpy</depend>
+
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+
+  <depend>joy</depend>
+
+  <exec_depend>python3-numpy</exec_depend>
+
+  <!-- Replace with your ROS2 custom interfaces package -->
+  <depend>uuv_gazebo_ros_plugins_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+
+</package>

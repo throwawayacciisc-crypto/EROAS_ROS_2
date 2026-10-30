@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+
+<package format="3">
+
+  <name>uuv_gazebo</name>
+
+  <version>0.6.13</version>
+
+  <description>
+    UUV Gazebo launch files, RViz configs and simulation setup
+    for ROS2 Jazzy with Gazebo Harmonic.
+  </description>
+
+  <maintainer email="musa.marcusso@de.bosch.com">
+    Musa Morena Marcusso Manhaes
+  </maintainer>
+
+  <maintainer email="sebastian.scherer2@de.bosch.com">
+    Sebastian Scherer
+  </maintainer>
+
+  <maintainer email="luizricardo.douat@de.bosch.com">
+    Luiz Ricardo Douat
+  </maintainer>
+
+  <author email="musa.marcusso@de.bosch.com">
+    Musa Morena Marcusso Manhaes
+  </author>
+
+  <author email="sebastian.scherer2@de.bosch.com">
+    Sebastian Scherer
+  </author>
+
+  <author email="luizricardo.douat@de.bosch.com">
+    Luiz Ricardo Douat
+  </author>
+
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>
+    ament_cmake
+  </buildtool_depend>
+
+  <!-- ROS2 -->
+
+  <exec_depend>rclcpp</exec_depend>
+
+  <exec_depend>launch</exec_depend>
+
+  <exec_depend>launch_ros</exec_depend>
+
+  <exec_depend>rviz2</exec_depend>
+
+  <exec_depend>xacro</exec_depend>
+
+  <exec_depend>robot_state_publisher</exec_depend>
+
+  <exec_depend>joint_state_publisher</exec_depend>
+
+  <!-- Gazebo Harmonic -->
+
+  <exec_depend>ros_gz_sim</exec_depend>
+
+  <exec_depend>ros_gz_bridge</exec_depend>
+
+  <exec_depend>ros_gz_interfaces</exec_depend>
+
+  <!-- UUV packages -->
+
+  <exec_depend>uuv_descriptions</exec_depend>
+
+  <exec_depend>uuv_thruster_manager</exec_depend>
+
+  <exec_depend>uuv_trajectory_control</exec_depend>
+
+  <exec_depend>uuv_control_cascaded_pid</exec_depend>
+
+  <exec_depend>uuv_teleop</exec_depend>
+
+  <exec_depend>uuv_gazebo_worlds</exec_depend>
+
+  <exec_depend>oberon4_control</exec_depend>
+
+  <exec_depend>oberon7_control</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+
+    <build_type>
+      ament_cmake
+    </build_type>
+
+  </export>
+
+</package>

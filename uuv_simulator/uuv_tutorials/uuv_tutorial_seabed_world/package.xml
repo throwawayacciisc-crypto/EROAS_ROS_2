@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>uuv_tutorial_seabed_world</name>
+  <version>0.6.13</version>
+
+  <description>
+    A simple tutorial on how to create a new Gazebo Harmonic seabed world
+    and configure it as a simulation scenario.
+  </description>
+
+  <maintainer email="musa.marcusso@de.bosch.com">
+    Musa Morena Marcusso Manhaes
+  </maintainer>
+
+  <maintainer email="sebastian.scherer2@de.bosch.com">
+    Sebastian Scherer
+  </maintainer>
+
+  <maintainer email="luizricardo.douat@de.bosch.com">
+    Luiz Ricardo Douat
+  </maintainer>
+
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- ROS 2 launch system -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- Gazebo Harmonic -->
+  <exec_depend>ros_gz_sim</exec_depend>
+
+  <export>
+  </export>
+</package>

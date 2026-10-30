@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd"
+            schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>uuv_sensor_ros_plugins</name>
+  <version>0.7.0</version>
+  <description>URDF snippets and assets for UUV sensor plugins on ROS 2 / Gazebo Harmonic.</description>
+
+  <maintainer email="musa.marcusso@de.bosch.com">Musa Morena Marcusso Manhaes</maintainer>
+  <maintainer email="sebastian.scherer2@de.bosch.com">Sebastian Scherer</maintainer>
+  <maintainer email="luizricardo.douat@de.bosch.com">Luiz Ricardo Douat</maintainer>
+
+  <author email="musa.marcusso@de.bosch.com">Musa Morena Marcusso Manhaes</author>
+  <author email="sebastian.scherer2@de.bosch.com">Sebastian Scherer</author>
+  <author email="luizricardo.douat@de.bosch.com">Luiz Ricardo Douat</author>
+
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>uuv_sensor_ros_plugins_msgs</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

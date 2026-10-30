@@ -1,0 +1,6 @@
+float64 min
+float64 max
+int32 n_points
+---
+float64[] input
+float64[] thrust

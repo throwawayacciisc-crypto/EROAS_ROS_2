@@ -1,0 +1,8 @@
+id: test_run_task_ocean_world
+
+execute:
+  cmd: "ros2 launch uuv_simulation_wrapper example_start_ocean_world.launch.py"
+  params:
+    record: true
+    gui: false
+    timeout: 1

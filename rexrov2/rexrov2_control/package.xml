@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rexrov2_control</name>
+  <version>0.1.3</version>
+
+  <description>
+    Launch and configuration package for RexROV2 controllers using uuv_trajectory_control.
+  </description>
+
+  <maintainer email="Musa.Marcusso@de.bosch.com">Musa Morena Marcusso Manhaes</maintainer>
+  <maintainer email="sebastian.scherer2@de.bosch.com">Sebastian Scherer</maintainer>
+  <maintainer email="LuizRicardo.Douat@de.bosch.com">Luiz Ricardo Douat</maintainer>
+
+  <license>Apache-2.0</license>
+
+  <!-- ===================== -->
+  <!-- Build system -->
+  <!-- ===================== -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- ===================== -->
+  <!-- Core ROS2 deps -->
+  <!-- ===================== -->
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+
+  <!-- ===================== -->
+  <!-- Gazebo Harmonic (gz-sim 8) -->
+  <!-- ===================== -->
+  <exec_depend>gz-sim8</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+
+  <!-- ===================== -->
+  <!-- Control stack (UUV) -->
+  <!-- ===================== -->
+  <exec_depend>uuv_control_cascaded_pid</exec_depend>
+  <exec_depend>uuv_thruster_manager</exec_depend>
+  <exec_depend>uuv_trajectory_control</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+
+</package>

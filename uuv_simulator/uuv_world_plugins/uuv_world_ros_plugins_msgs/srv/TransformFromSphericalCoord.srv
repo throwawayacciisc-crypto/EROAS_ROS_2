@@ -1,0 +1,5 @@
+float64 latitude_deg
+float64 longitude_deg
+float64 altitude
+---
+geometry_msgs/Vector3 output

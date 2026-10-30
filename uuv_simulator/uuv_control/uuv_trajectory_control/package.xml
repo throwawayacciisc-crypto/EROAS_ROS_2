@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<package format="3">
+
+  <name>uuv_trajectory_control</name>
+
+  <version>0.6.13</version>
+
+  <description>
+    UUV trajectory control ROS2 package
+  </description>
+
+  <maintainer email="luizricardo.douat@de.bosch.com">
+    Luiz Ricardo Douat
+  </maintainer>
+
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>ament_cmake_python</build_depend>
+
+  <depend>rclpy</depend>
+
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>std_msgs</depend>
+
+  <depend>visualization_msgs</depend>
+
+  <depend>uuv_control_msgs</depend>
+
+  <depend>uuv_assistants</depend>
+
+  <depend>tf2_ros</depend>
+
+  <exec_depend>python3-numpy</exec_depend>
+
+  <exec_depend>python3-scipy</exec_depend>
+
+  <exec_depend>python3-yaml</exec_depend>
+
+  <exec_depend>python3-matplotlib</exec_depend>
+
+  <test_depend>ament_cmake_pytest</test_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+      <build_type>ament_cmake</build_type>
+  </export>
+
+</package>
