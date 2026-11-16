@@ -47,8 +47,10 @@ The acoustic model (`sonar_calculation_cuda.cu`) and the messages are unchanged.
    callback slowed the whole simulation to the sonar's frame time. The callback
    now hands the latest depth image to a worker thread (dropping frames it can't
    keep up with), like Gazebo Classic ran sensors off the physics thread.
-4. **Display images only when subscribed:** the fan image costs one `cv::ellipse`
-   per beam per range bin (~0.3 s per frame for 513 beams x 598 bins).
+4. **Display images only when subscribed**, and drawn through a pixel → (beam, bin)
+   lookup table built once (upstream drew one `cv::ellipse` per beam per range bin,
+   ~0.3 s per frame for 513 beams x 598 bins). Frames with no returns draw black
+   (upstream normalised them into a uniform bright fan).
 5. **Small speed-ups with identical output:** point-cloud field offsets looked up
    once per frame instead of per point, and the dB image written straight into
    the message buffer.

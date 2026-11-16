@@ -2,6 +2,8 @@
 
 ## Quick start (ROS 2 Jazzy / Gazebo Harmonic, original EROAS logic)
 
+**New machine? See [SETUP.md](SETUP.md)**: installing Docker and the GPU tools, then `./run_eroas.sh setup` and `./run_eroas.sh start`.
+
 By default the demo now runs the **original AIRLabIISc/EROAS algorithm** on the
 **DAVE multibeam sonar**, wired as in the ROS 1 `start_EROAS_demo.launch`:
 
