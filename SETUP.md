@@ -74,10 +74,11 @@ docker run --rm --gpus all ubuntu nvidia-smi
 
 ## 4. Build
 
-From this folder (copy it anywhere on the machine first, not onto a FAT/exFAT
-USB drive):
+Get the code onto the machine's own disk (not a FAT/exFAT USB drive) and build:
 
 ```bash
+git clone https://github.com/throwawayacciisc-crypto/EROAS_ROS_2.git
+cd EROAS_ROS_2
 ./run_eroas.sh setup
 ```
 
